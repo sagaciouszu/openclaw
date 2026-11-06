@@ -59,7 +59,9 @@ const controlUiPerformanceBudgets = {
   newBootCssRequests: 3,
   // Generated-name-normalized main measurement plus 64 B toolchain headroom.
   // Retired copy, browser fallbacks, and unused initializers: measured head plus 64 B.
-  chatBootJsGzipBytes: 1_287_197,
+  // Josh Lehman approved the OpenClaw ID sidebar mounts and sign-in callback check
+  // (#192352, 2026-11-06): Chat measures 1,287,997 B; retain 64 B headroom.
+  chatBootJsGzipBytes: 1_288_061,
   newBootJsGzipBytes: 796_484,
   startupCssRequests: 1,
   // Solid 2 action/optimistic runtime adoption; offset tracked by HF-STARTUP-BUDGET.
@@ -75,8 +77,10 @@ const controlUiPerformanceBudgets = {
   // sheets. Approved 2026-10-22: 57,154 B plus the prior 53,400 / 52,337 headroom.
   largestCssGzipBytes: 58_315,
   // Retired selectors and supported-browser fallback removal: measured head plus 64 B.
-  totalCssGzipBytes: 324_684,
-  totalCssRawBytes: 1_675_356,
+  // Josh Lehman approved the OpenClaw ID account menu styles (#192352, 2026-11-06):
+  // measured 325,045 B gzip / 1,675,690 B raw; retain 64 B headroom.
+  totalCssGzipBytes: 325_109,
+  totalCssRawBytes: 1_675_754,
 } satisfies Record<string, number>;
 export const CONTROL_UI_PERFORMANCE_BUDGETS = Object.freeze(controlUiPerformanceBudgets);
 
