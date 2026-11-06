@@ -270,7 +270,8 @@ export function readUpdateDatabaseGeneration(
     content: { sha256: string; family?: SqlitePrivateSnapshotFamily },
     prepared?: PreparedSqliteReadOnlyLocation,
   ): { observation: DatabaseGenerationObservation; retained: boolean } => {
-    const current = readStableSqliteFileGeneration(pathname, readGeneration);
+    // Without a digest-verified copy, only fresh bytes prove the digest named this content.
+    const current = readStableSqliteFileGeneration(pathname, prepared ? readGeneration : undefined);
     const after = readWalIndexHeader(pathname);
     verifyGenerationFamily(pathname, entries, current);
     if (
