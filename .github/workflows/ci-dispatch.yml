@@ -1,0 +1,94 @@
+name: ci-dispatch
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR number to investigate"
+        required: true
+        default: "194575"
+      mode:
+        description: "diagnose (open draft PR) or report (comment only)"
+        required: false
+        default: "diagnose"
+        type: choice
+        options: [diagnose, report]
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: read
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout fork PR branch
+        uses: actions/checkout@v4
+        with:
+          repository: sagaciouszu/openclaw
+          ref: feat/picker-hidden-agents
+          token: ${{ secrets.REBASE_TOKEN || secrets.GITHUB_TOKEN }}
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install opencode
+        run: npm i -g opencode-ai
+
+      - name: Check PR CI status
+        id: ci
+        env:
+          GH_TOKEN: ${{ secrets.REBASE_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          PR="${{ inputs.pr_number }}"
+          failed=$(gh pr checks "$PR" --repo openclaw/openclaw --json name,state,conclusion \
+            | jq -r '[.[] | select(.conclusion=="FAILURE" or .conclusion=="TIMED_OUT" or .conclusion=="CANCELLED")] | length')
+          echo "failed_checks=$failed" >> "$GITHUB_OUTPUT"
+          if [ "$failed" = "0" ]; then
+            echo "All checks green (or none reported). Nothing to do."
+            echo "failed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "failed=true" >> "$GITHUB_OUTPUT"
+            echo "$failed failing check(s) detected."
+          fi
+
+      - name: Diagnose and open draft PR
+        if: steps.ci.outputs.failed == 'true' && inputs.mode == 'diagnose'
+        env:
+          GH_TOKEN: ${{ secrets.REBASE_TOKEN || secrets.GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          set -euo pipefail
+          git config user.name "ci-dispatch[bot]"
+          git config user.email "ci-dispatch@users.noreply.github.com"
+          # Create a work branch for the diagnosis
+          BRANCH="ci-dispatch/$(date -u +%Y%m%d-%H%M%S)"
+          git checkout -b "$BRANCH"
+          opencode run --auto --prompt \
+            "CI is failing on PR #${{ inputs.pr_number }} in openclaw/openclaw. \
+             1) Run the failing tests locally and capture the actual error. \
+             2) Diagnose the root cause in the changed code (do not weaken tests). \
+             3) Propose the minimal fix. \
+             4) Apply the fix, run the affected tests, and if they pass open a DRAFT PR \
+                titled 'fix: CI failure on PR #${{ inputs.pr_number }}' against \
+                feat/picker-hidden-agents using gh, referencing this run. \
+             5) If you cannot fix it, open a draft PR with a diagnosis comment instead. \
+             Never push directly to feat/picker-hidden-agents." \
+            .
+          # If opencode opened a PR, the step is done; otherwise ensure we pushed the branch.
+          if git rev-parse --abbrev-ref HEAD | grep -q '^ci-dispatch/'; then
+            git push origin "HEAD:$BRANCH" || true
+          fi
+
+      - name: Report only (no changes)
+        if: steps.ci.outputs.failed == 'true' && inputs.mode == 'report'
+        env:
+          GH_TOKEN: ${{ secrets.REBASE_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          PR="${{ inputs.pr_number }}"
+          gh pr comment "$PR" --repo openclaw/openclaw --body \
+            "CI failure detected on head \`$(git rev-parse HEAD)\`. Trigger \`ci-dispatch\` with mode=diagnose to investigate."
