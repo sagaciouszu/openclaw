@@ -18,6 +18,7 @@ jobs:
           repository: sagaciouszu/openclaw
           ref: feat/picker-hidden-agents
           fetch-depth: 0
+          token: ${{ secrets.REBASE_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Configure git
         run: |
