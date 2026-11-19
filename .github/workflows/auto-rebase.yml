@@ -1,0 +1,60 @@
+name: auto-rebase
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  rebase:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout fork PR branch
+        uses: actions/checkout@v4
+        with:
+          repository: sagaciouszu/openclaw
+          ref: feat/picker-hidden-agents
+          token: ${{ secrets.REBASE_TOKEN }}
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name "auto-rebase[bot]"
+          git config user.email "auto-rebase@users.noreply.github.com"
+          git remote add upstream https://github.com/openclaw/openclaw.git
+
+      - name: Fetch upstream main
+        run: git fetch upstream main
+
+      - name: Rebase onto upstream main
+        run: |
+          if git merge-base --is-ancestor upstream/main HEAD; then
+            echo "Already up to date with upstream/main"
+            exit 0
+          fi
+          git rebase upstream/main || {
+            # Resolve conflicts only in generated baseline files, then regenerate.
+            git checkout --theirs docs/.generated/config-baseline.sha256 docs/.generated/config-baseline.counts.json 2>/dev/null || true
+            git add docs/.generated/config-baseline.sha256 docs/.generated/config-baseline.counts.json 2>/dev/null || true
+            GIT_EDITOR=true git rebase --continue
+          }
+
+      - name: Regenerate config baseline
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile --ignore-scripts
+          node --import ./scripts/tsx.mjs scripts/generate-config-doc-baseline.ts --write
+          node --import ./scripts/tsx.mjs scripts/generate-config-doc-baseline.ts --check
+
+      - name: Amend and push if changed
+        run: |
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to push"
+            exit 0
+          fi
+          git commit --amend --no-edit
+          git push --force-with-lease origin feat/picker-hidden-agents
