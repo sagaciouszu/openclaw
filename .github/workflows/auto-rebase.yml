@@ -17,7 +17,7 @@ jobs:
         with:
           repository: sagaciouszu/openclaw
           ref: feat/picker-hidden-agents
-          fetch-depth: 1
+          fetch-depth: 0
 
       - name: Configure git
         run: |
@@ -26,7 +26,7 @@ jobs:
           git remote add upstream https://github.com/openclaw/openclaw.git
 
       - name: Fetch upstream main
-        run: git fetch --depth 1000 upstream main
+        run: git fetch upstream main
 
       - name: Rebase onto upstream main
         run: |
