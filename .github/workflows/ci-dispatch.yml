@@ -13,6 +13,10 @@ on:
         default: "diagnose"
         type: choice
         options: [diagnose, report]
+      model:
+        description: "opencode model, e.g. openai/gpt-4o-mini"
+        required: false
+        default: "openai/gpt-4o-mini"
 
 permissions:
   contents: write
@@ -68,7 +72,7 @@ jobs:
           # Create a work branch for the diagnosis
           BRANCH="ci-dispatch/$(date -u +%Y%m%d-%H%M%S)"
           git checkout -b "$BRANCH"
-          opencode run --auto --prompt \
+          opencode run --auto --model "${{ inputs.model }}" --prompt \
             "CI is failing on PR #${{ inputs.pr_number }} in openclaw/openclaw. \
              1) Run the failing tests locally and capture the actual error. \
              2) Diagnose the root cause in the changed code (do not weaken tests). \
